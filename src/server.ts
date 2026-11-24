@@ -78,7 +78,11 @@ export function buildServer(config: ServerConfig): McpServer {
         "Time fields such as _minute, _day or _month can be added to 'columns' to split the " +
         "result by time (e.g. per day). Long-running queries are polled automatically; if the " +
         "query is still running when the timeout is reached, the queue status is returned and " +
-        "the identical query can simply be sent again.",
+        "the identical query can simply be sent again. IMPORTANT: do not page with 'skip' — past " +
+        "some point Kilkaya silently returns empty pages, so paged results look complete but are " +
+        "cut off (verified 2026-11: 1,000 of 2,144 rows). Request everything in ONE call with a " +
+        "large enough 'limit' (up to 100000) or narrow the query (shorter period, more filters, " +
+        "fewer columns). If the result has exactly 'limit' rows it may be cut off.",
       inputSchema: {
         schemaname: z
           .string()
@@ -101,12 +105,30 @@ export function buildServer(config: ServerConfig): McpServer {
           .array(z.enum(["asc", "desc"]))
           .optional()
           .describe("Sort direction per sortby entry"),
-        limit: z.number().int().positive().optional().describe("Max rows to return, e.g. 100"),
-        skip: z.number().int().min(0).optional().describe("Rows to skip (pagination)"),
+        limit: z
+          .number()
+          .int()
+          .positive()
+          .max(100000)
+          .optional()
+          .describe("Max rows to return in this one call (up to 100000). Set it high enough for all rows"),
+        skip: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("Must be 0 or omitted: paging with skip silently cuts results (use a larger limit)"),
       },
     },
     async (args) =>
       run(async () => {
+        if (args.skip) {
+          throw new Error(
+            "skip > 0 is not allowed: Kilkaya silently returns empty pages past some point, so paged " +
+              "results look complete but are cut off. Send ONE query with a larger 'limit' (up to " +
+              "100000) instead, or narrow it (shorter period, more filters, fewer columns)."
+          );
+        }
         const { pending, result } = await client.query(args);
         if (pending) {
           return {
@@ -114,6 +136,15 @@ export function buildServer(config: ServerConfig): McpServer {
               "The query is still queued/running on the Kilkaya side. " +
               "Re-run this exact tool call to continue polling for the result.",
             status: result,
+          };
+        }
+        const rows = (result as { data?: unknown[] } | null)?.data;
+        if (args.limit && Array.isArray(rows) && rows.length >= args.limit) {
+          return {
+            note:
+              `The result has exactly limit=${args.limit} rows and is probably cut off. ` +
+              "Re-run with a larger limit (up to 100000) or a narrower query — do not use skip.",
+            ...(result as object),
           };
         }
         return result;
