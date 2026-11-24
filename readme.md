@@ -11,7 +11,7 @@ Standardmäßig aktiv (read-only):
 
 | Tool | Kilkaya-Endpunkt | Beschreibung |
 | --- | --- | --- |
-| `kilkaya_query` | `POST /api/query` | Analytics-Query (Haupt-API). Antwort im JSON:API-Format. 202-Antworten („Query queued/running") werden automatisch alle 2,5 s neu gesendet, bis das Ergebnis da ist (Timeout konfigurierbar). |
+| `kilkaya_query` | `POST /api/query` | Analytics-Query (Haupt-API). Antwort im JSON:API-Format. 202-Antworten („Query queued/running") werden automatisch alle 2,5 s neu gesendet, bis das Ergebnis da ist (Timeout konfigurierbar). `skip` > 0 wird abgelehnt: Blättern liefert bei Kilkaya ab einer bestimmten Stelle stillschweigend leere Seiten (geprüft 11/2026). Stattdessen eine Abfrage mit großem `limit` (bis 100.000). Hat das Ergebnis genau `limit` Zeilen, hängt der Server einen Hinweis an. |
 | `kilkaya_list_schemas` | `GET /api/schemas` | Verfügbare Schemas inkl. Felddefinitionen. `allfields` ist die verbindliche Liste gültiger Felder, `timefields` (`_minute`, `_day`, `_month`, …) können als Spalten für Zeitaggregation ergänzt werden. |
 | `kilkaya_get_metadata` | `GET /api/metadata` | Metadaten für eine Artikel-URL (ohne Protokoll). |
 | `kilkaya_get_metadata_bulk` | `POST /api/metadata` | Metadaten für viele URLs auf einmal. |
